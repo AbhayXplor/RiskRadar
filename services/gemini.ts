@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types";
+import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types.ts";
 
 // Always initialize GoogleGenAI with { apiKey: process.env.API_KEY } inside functions to ensure correct key usage and prevent key leakage or misuse.
 export const resolveEntities = async (query: string, config: { model: GeminiModel }): Promise<CandidateEntity[]> => {

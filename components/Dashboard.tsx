@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { Borrower, RiskSeverity, RiskSignal, RiskCategory, CandidateEntity, GeminiModel } from '../types';
-import { Radar, ExternalLink, Info, Plus, Shield, FileText, CheckCircle, Search, Network, Scale, Lock, Briefcase } from './Icons';
-import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini';
+import { Borrower, RiskSeverity, RiskSignal, RiskCategory, CandidateEntity, GeminiModel } from '../types.ts';
+import { Radar, ExternalLink, Info, Plus, Shield, FileText, CheckCircle, Search, Network, Scale, Lock, Briefcase } from './Icons.tsx';
+import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini.ts';
 
 const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => {
   // Config State

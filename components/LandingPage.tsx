@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, Radar, AlertTriangle, Briefcase, Lock, Search, Network, CheckCircle, Scale, FileText } from './Icons';
+import { Shield, Radar, AlertTriangle, Briefcase, Lock, Search, Network, CheckCircle, Scale, FileText } from './Icons.tsx';
 
 interface LandingPageProps {
   onGetStarted: () => void;
