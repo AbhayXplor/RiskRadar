@@ -2,9 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types.ts";
 
-// Always initialize GoogleGenAI with { apiKey: process.env.API_KEY } inside functions to ensure correct key usage and prevent key leakage or misuse.
-export const resolveEntities = async (query: string, config: { model: GeminiModel }): Promise<CandidateEntity[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const resolveEntities = async (query: string, config: { model: GeminiModel, apiKey: string }): Promise<CandidateEntity[]> => {
+  const ai = new GoogleGenAI({ apiKey: config.apiKey });
   const prompt = `Search for 3 corporate entities matching: "${query}". Return Official Name, Ticker, Industry, and 1-sentence description in JSON.`;
 
   try {
@@ -41,14 +40,13 @@ export const resolveEntities = async (query: string, config: { model: GeminiMode
       groundingSources: webSources
     }));
   } catch (e) {
-    // Re-throw to allow dashboard to handle "Requested entity was not found." error
     console.error("Resolution failed", e);
     throw e;
   }
 };
 
-export const analyzeBorrowerRisk = async (name: string, industry: string, config: { model: GeminiModel }): Promise<RiskAnalysisResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const analyzeBorrowerRisk = async (name: string, industry: string, config: { model: GeminiModel, apiKey: string }): Promise<RiskAnalysisResult> => {
+  const ai = new GoogleGenAI({ apiKey: config.apiKey });
   
   const prompt = `It is currently early 2026. Perform deep risk surveillance for "${name}" (${industry}).
   REQUIRED TASKS:
@@ -111,7 +109,6 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
       signals: mappedSignals
     };
   } catch (error) {
-    // Re-throw to allow dashboard to handle "Requested entity was not found." error
     console.error("Analysis failed", error);
     throw error;
   }

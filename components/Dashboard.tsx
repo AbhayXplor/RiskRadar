@@ -4,17 +4,11 @@ import { Borrower, RiskSeverity, RiskSignal, RiskCategory, CandidateEntity, Gemi
 import { Radar, ExternalLink, Info, Plus, Shield, FileText, CheckCircle, Search, Network, Scale, Lock, Briefcase } from './Icons.tsx';
 import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini.ts';
 
-// Using the pre-defined AIStudio type to avoid type declaration conflicts.
-declare global {
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
-
 const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => {
   // Config State
-  const [model, setModel] = useState<GeminiModel>('gemini-3-flash-preview');
-  const [hasKey, setHasKey] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('riskradar_key') || '');
+  const [model, setModel] = useState<GeminiModel>(() => (localStorage.getItem('riskradar_model') as GeminiModel) || 'gemini-3-flash-preview');
+  const [showConfig, setShowConfig] = useState(false);
   
   // Data State
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
@@ -28,25 +22,11 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
   const [candidates, setCandidates] = useState<CandidateEntity[] | null>(null);
   const [isResolving, setIsResolving] = useState(false);
 
+  // Persist config
   useEffect(() => {
-    const checkKey = async () => {
-      if (process.env.API_KEY) {
-        setHasKey(true);
-      } else if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasKey(selected);
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Assume success after opening dialog to mitigate potential race conditions.
-      setHasKey(true);
-    }
-  };
+    localStorage.setItem('riskradar_key', apiKey);
+    localStorage.setItem('riskradar_model', model);
+  }, [apiKey, model]);
 
   const selectedBorrower = useMemo(() => borrowers.find(b => b.id === selectedId) || null, [borrowers, selectedId]);
   const currentSignals = useMemo(() => (selectedId && cachedData[selectedId]?.signals) || [], [cachedData, selectedId]);
@@ -64,23 +44,18 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
 
   const handleStartResolution = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasKey) {
-      await handleSelectKey();
+    if (!apiKey) {
+      alert("Please provide an API Key in the Terminal Config.");
+      setShowConfig(true);
       return;
     }
     if (!searchQuery.trim()) return;
     setIsResolving(true);
     try {
-      const results = await resolveEntities(searchQuery, { model });
+      const results = await resolveEntities(searchQuery, { model, apiKey });
       setCandidates(results);
     } catch (err: any) {
-      // Prompt user to select a key again if a "Requested entity was not found." error occurs.
-      if (err?.message?.includes("Requested entity was not found.")) {
-        setHasKey(false);
-        await handleSelectKey();
-      } else {
-        alert("Resolution failed. Verify your API key is configured.");
-      }
+      alert(`Terminal Error: ${err.message || 'Check your API key and permissions.'}`);
     } finally {
       setIsResolving(false);
     }
@@ -91,7 +66,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
     setSearchQuery('');
     setLoading(true);
     try {
-      const result = await analyzeBorrowerRisk(candidate.name, candidate.industry, { model });
+      const result = await analyzeBorrowerRisk(candidate.name, candidate.industry, { model, apiKey });
       const newId = Date.now().toString();
       const newBorrower: Borrower = {
         id: newId,
@@ -109,13 +84,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
       setCachedData(prev => ({ ...prev, [newId]: { signals: result.signals, summary: result.summarySentence, benchmark: result.benchmarkScore } }));
       setSelectedId(newId);
     } catch (e: any) {
-      // Prompt user to select a key again if a "Requested entity was not found." error occurs.
-      if (e?.message?.includes("Requested entity was not found.")) {
-        setHasKey(false);
-        await handleSelectKey();
-      } else {
-        alert("Analysis failed. Ensure you have selected a valid API Key with Search Grounding enabled.");
-      }
+      alert(`Surveillance Failed: ${e.message}. Ensure Search Grounding is enabled on your project.`);
     } finally {
       setLoading(false);
     }
@@ -186,39 +155,58 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
             </div>
           )}
         </nav>
+
+        {/* Manual Config Footer */}
+        <div className="p-6 border-t border-slate-800 bg-slate-950/50">
+          <button 
+            onClick={() => setShowConfig(!showConfig)}
+            className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors"
+          >
+            <span>Terminal Config</span>
+            <Lock className="w-3 h-3" />
+          </button>
+          {showConfig && (
+            <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+               <div className="space-y-2">
+                 <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest">API Key</label>
+                 <input 
+                   type="password"
+                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-[10px] focus:ring-1 focus:ring-blue-500 outline-none"
+                   placeholder="Enter Key..."
+                   value={apiKey}
+                   onChange={(e) => setApiKey(e.target.value)}
+                 />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Engine</label>
+                 <select 
+                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-[10px] outline-none"
+                   value={model}
+                   onChange={(e) => setModel(e.target.value as GeminiModel)}
+                 >
+                   <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                   <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                 </select>
+               </div>
+               <p className="text-[8px] text-slate-600 italic">Keys are stored locally in your browser.</p>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Main Area */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Header */}
         <header className="shrink-0 bg-white border-b border-slate-200 px-10 py-4 flex items-center justify-between z-10 shadow-sm">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Engine:</span>
-              <select 
-                className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-[11px] text-slate-900 font-bold focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
-                value={model}
-                onChange={(e) => setModel(e.target.value as GeminiModel)}
-              >
-                <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
-              </select>
-            </div>
+          <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+            <span className="text-slate-400">Current Node:</span>
+            <span className="text-slate-900 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">{model}</span>
           </div>
           <div className="flex items-center gap-4">
-            {!hasKey ? (
-              <button 
-                onClick={handleSelectKey}
-                className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100"
-              >
-                Connect to Gemini API
-              </button>
-            ) : (
-              <div className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                OSINT Grounding Active
-              </div>
-            )}
+            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <div className={`w-2 h-2 rounded-full ${apiKey ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+              Terminal {apiKey ? 'Armed' : 'Offline'}
+            </div>
           </div>
         </header>
 
@@ -227,26 +215,34 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
             <div className="relative">
                <Radar className="w-16 h-16 text-blue-600" />
             </div>
-            <div className="mt-8 text-sm font-black uppercase tracking-[0.5em] text-slate-900">{loading ? 'Indexing Risk Data...' : 'Resolving Identity...'}</div>
+            <div className="mt-8 text-sm font-black uppercase tracking-[0.5em] text-slate-900">{loading ? 'Running Surveillance...' : 'Resolving Identity...'}</div>
           </div>
         ) : !selectedBorrower ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-center p-12">
-            {!hasKey && (
-              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 mb-10 max-w-sm">
-                <p className="text-amber-700 text-[10px] font-black uppercase tracking-widest mb-4">Action Required</p>
-                <p className="text-xs text-amber-600 font-medium leading-relaxed mb-6">You must select a Gemini API key from a paid GCP project to use real-time search grounding.</p>
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold underline mb-4 block">Billing Documentation</a>
-                <button onClick={handleSelectKey} className="w-full bg-slate-900 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px]">Bring Your Key</button>
+            {!apiKey && (
+              <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl mb-12 max-w-sm border border-slate-800">
+                 <Lock className="w-12 h-12 text-blue-500 mb-6 mx-auto" />
+                 <h3 className="text-white font-black text-xl mb-3 uppercase tracking-tighter">Identity Required</h3>
+                 <p className="text-slate-500 text-xs font-medium leading-relaxed mb-8">Enter your Gemini API key in the terminal config or below to unlock OSINT capabilities.</p>
+                 <input 
+                   type="password"
+                   className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-xs text-white mb-4 outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="Enter Gemini API Key..."
+                   value={apiKey}
+                   onChange={(e) => setApiKey(e.target.value)}
+                 />
+                 <p className="text-[9px] text-slate-600 uppercase tracking-widest font-black italic">Search Grounding Enabled Project Required</p>
               </div>
             )}
             <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-2xl border border-slate-100 mb-10">
                <Shield className="w-12 h-12 opacity-10 text-slate-900" />
             </div>
             <h3 className="text-slate-900 font-black text-2xl mb-3 uppercase tracking-tighter italic">Terminal Ready</h3>
-            <p className="max-w-xs text-sm text-slate-500 leading-relaxed font-medium uppercase tracking-widest text-[10px]">Select or add a borrower to initialize OSINT surveillance.</p>
+            <p className="max-w-xs text-sm text-slate-500 leading-relaxed font-medium uppercase tracking-widest text-[10px]">Initialize monitoring using the sidebar search.</p>
           </div>
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden">
+             {/* Dashboard Header */}
              <div className="px-10 pt-10 pb-6 bg-white border-b border-slate-100">
                 <div className="max-w-7xl mx-auto flex justify-between items-end">
                   <div>
@@ -271,6 +267,8 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                   </div>
                 </div>
               </div>
+              
+              {/* Main Feed */}
               <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">
                 <div className="max-w-7xl mx-auto">
                    {activeTab === 'news' && (
@@ -280,85 +278,101 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                            <p className="text-lg leading-relaxed font-bold italic text-slate-800">"{currentSummary}"</p>
                          </div>
                          {currentSignals.map(sig => (
-                           <div key={sig.id} className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
-                             <h4 className="text-2xl font-black text-slate-900 mb-4 uppercase italic tracking-tight">{sig.title}</h4>
-                             <p className="text-slate-600 text-base leading-relaxed mb-6">{sig.summary}</p>
+                           <div key={sig.id} className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl group">
+                             <div className="flex justify-between items-center mb-6">
+                               <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${getSeverityColor(sig.severity)}`}>{sig.severity} Severity</span>
+                               <span className="text-[10px] font-black text-slate-400 uppercase">{sig.date}</span>
+                             </div>
+                             <h4 className="text-2xl font-black text-slate-900 mb-4 uppercase italic tracking-tight group-hover:text-blue-600 transition-colors">{sig.title}</h4>
+                             <p className="text-slate-600 text-base leading-relaxed mb-6 font-medium">{sig.summary}</p>
+                             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 mb-8">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Surveillance Memo</span>
+                                <p className="text-xs text-slate-700 font-bold italic leading-relaxed">{sig.impact}</p>
+                             </div>
                              <div className="flex flex-wrap gap-4 pt-6 border-t border-slate-100">
                                {sig.groundingSources?.map((s, i) => (
-                                 <a key={i} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl text-[10px] font-black text-blue-600">
-                                   <ExternalLink className="w-3.5 h-3.5" /> Proof Link
+                                 <a key={i} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl text-[10px] font-black text-blue-600 hover:bg-blue-600 hover:text-white transition-all">
+                                   <ExternalLink className="w-3.5 h-3.5" /> Source Proof
                                  </a>
                                ))}
                              </div>
                            </div>
                          ))}
                        </div>
+                       
+                       <div className="space-y-8">
+                          <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white">
+                             <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8">Risk Composition</h4>
+                             <div className="space-y-4">
+                                {Object.values(RiskCategory).map(cat => {
+                                  const count = currentSignals.filter(s => s.category === cat).length;
+                                  return count > 0 ? (
+                                    <div key={cat} className="flex justify-between items-center text-xs font-bold uppercase tracking-widest border-b border-slate-800 pb-3">
+                                       <span className="text-slate-400">{cat}</span>
+                                       <span className="text-blue-400">{count}</span>
+                                    </div>
+                                  ) : null;
+                                })}
+                             </div>
+                          </div>
+                       </div>
                      </div>
                    )}
                    {activeTab === 'legal' && (
-                     <div className="space-y-8">
-                       <div className="bg-slate-900 text-white p-10 rounded-[3rem] shadow-xl">
-                         <div className="flex items-center gap-4 mb-8">
-                           <Scale className="w-8 h-8 text-blue-400" />
-                           <h3 className="text-3xl font-black uppercase italic tracking-tighter">Covenant Clause Mapping</h3>
-                         </div>
-                         <div className="grid gap-6">
-                            {currentSignals.filter(s => s.category === RiskCategory.LEGAL || s.category === RiskCategory.REGULATORY).map(sig => (
-                              <div key={sig.id} className="p-8 bg-slate-800 rounded-2xl border border-slate-700">
-                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Detected Signal</div>
-                                <div className="text-xl font-bold mb-4">{sig.title}</div>
-                                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                                  <div className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1">Covenant Impact</div>
-                                  <div className="text-sm font-medium text-slate-300 italic">{sig.covenantImpact || "No direct covenant friction mapped."}</div>
-                                </div>
+                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {currentSignals.map(sig => sig.covenantImpact && sig.covenantImpact.toLowerCase() !== "none" ? (
+                          <div key={sig.id} className="bg-white border-l-8 border-l-red-500 rounded-r-[3rem] border border-slate-200 p-12 shadow-xl flex gap-10">
+                            <div className="shrink-0 p-6 bg-red-50 rounded-[2rem] h-fit">
+                              <Scale className="w-10 h-10 text-red-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-3xl font-black text-slate-900 mb-6 uppercase tracking-tight italic leading-tight">{sig.title}</h4>
+                              <div className="p-8 bg-slate-900 rounded-[2rem] border-2 border-slate-800">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4 block">Covenant Mapping</span>
+                                <p className="text-lg font-bold text-slate-200 italic leading-relaxed">"{sig.covenantImpact}"</p>
                               </div>
-                            ))}
-                         </div>
-                       </div>
+                            </div>
+                          </div>
+                        ) : null)}
                      </div>
                    )}
                    {activeTab === 'supply' && (
-                     <div className="space-y-8">
-                       <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
-                         <div className="flex items-center gap-4 mb-8">
-                           <Network className="w-8 h-8 text-blue-600" />
-                           <h3 className="text-3xl font-black uppercase italic tracking-tighter">Supply Chain Contagion</h3>
-                         </div>
-                         <div className="grid md:grid-cols-2 gap-8">
-                            {currentSignals.map(sig => (
-                              <div key={sig.id} className="p-8 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="font-bold mb-3">{sig.title}</div>
-                                <div className="text-sm text-slate-500 leading-relaxed italic">{sig.supplyChainRipple || "Localized impact; low systemic ripple detected."}</div>
-                              </div>
-                            ))}
-                         </div>
-                       </div>
+                     <div className="grid md:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {currentSignals.map(sig => (
+                          <div key={sig.id} className="bg-slate-900 text-white p-12 rounded-[3.5rem] border border-slate-800 shadow-3xl relative overflow-hidden group">
+                            <Network className="absolute top-0 right-0 p-10 opacity-10 w-32 h-32 group-hover:scale-125 transition-transform duration-1000" />
+                            <h4 className="text-3xl font-black mb-8 leading-tight tracking-tight uppercase italic">{sig.title}</h4>
+                            <div className="p-8 bg-white/5 rounded-[2rem] border border-white/10 italic text-base leading-relaxed text-slate-300">
+                              {sig.supplyChainRipple || "Localized impact; low network risk ripple."}
+                            </div>
+                          </div>
+                        ))}
                      </div>
                    )}
                    {activeTab === 'memo' && (
-                     <div className="max-w-4xl mx-auto bg-white p-16 rounded-[4rem] shadow-2xl border border-slate-100">
-                        <div className="flex justify-between items-start mb-16">
-                           <div>
-                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Internal Monitoring Memo</div>
-                             <h2 className="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Credit Committee Brief</h2>
-                           </div>
-                           <div className="text-right">
-                             <div className="text-[10px] font-bold text-slate-500 uppercase">{new Date().toLocaleDateString()}</div>
-                             <div className="text-[10px] font-bold text-blue-600 uppercase mt-1">Status: {selectedBorrower.riskStatus}</div>
-                           </div>
+                     <div className="max-w-4xl mx-auto bg-white p-20 rounded-[4rem] shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-10 duration-700">
+                        <div className="border-b-4 border-slate-900 pb-12 mb-16">
+                           <h2 className="text-5xl font-black uppercase tracking-tighter italic leading-none">Internal Assessment Memo</h2>
+                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">Confidential Terminal Record | {new Date().toLocaleDateString()}</div>
                         </div>
-                        <div className="space-y-10 text-slate-800 leading-relaxed font-medium">
-                           <p className="text-xl italic font-bold">"Overall assessment for {selectedBorrower.name} indicates {selectedBorrower.riskStatus.toLowerCase()} risk profile based on current OSINT surveillance."</p>
-                           <div className="grid gap-6">
-                              <h4 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-100 pb-2">Key Highlights</h4>
-                              {currentSignals.slice(0, 3).map(sig => (
-                                <div key={sig.id} className="flex gap-4">
-                                   <div className="shrink-0 w-1.5 h-1.5 bg-blue-600 rounded-full mt-2.5" />
-                                   <div>
-                                      <span className="font-bold">{sig.title}:</span> {sig.impact}
+                        <div className="space-y-12">
+                           <div className="space-y-6">
+                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">01 Executive Summary</h4>
+                              <p className="text-2xl leading-relaxed font-bold italic border-l-8 border-blue-600 pl-10 text-slate-800">"{currentSummary}"</p>
+                           </div>
+                           <div className="space-y-6">
+                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">02 Observed Risk Signals</h4>
+                              <div className="space-y-8">
+                                 {currentSignals.map((s, i) => (
+                                   <div key={i} className="flex gap-10 pb-8 border-b border-slate-100 last:border-0">
+                                      <span className="font-black text-blue-600 text-3xl leading-none italic">0{i+1}</span>
+                                      <div className="flex-1">
+                                        <div className="font-black text-slate-900 text-xl mb-3 uppercase tracking-tight">{s.title}</div>
+                                        <div className="text-base text-slate-500 leading-relaxed font-medium">{s.impact}</div>
+                                      </div>
                                    </div>
-                                </div>
-                              ))}
+                                 ))}
+                              </div>
                            </div>
                         </div>
                      </div>
@@ -373,9 +387,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-6">
             <div className="bg-white rounded-[2.5rem] shadow-3xl w-full max-w-xl overflow-hidden border border-slate-200">
               <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm mb-1">Entity Verification</h3>
-                </div>
+                <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm mb-1">Entity Verification</h3>
                 <button onClick={() => setCandidates(null)} className="text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full">✕</button>
               </div>
               <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
