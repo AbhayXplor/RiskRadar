@@ -1,0 +1,7 @@
+{
+  "name": "RiskRadar v2",
+  "description": "A professional borrower monitoring tool for lenders that tracks public, non-financial risk signals using open-source information and Gemini search grounding.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
