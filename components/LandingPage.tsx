@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, Radar, Briefcase, Lock, Search, Network, CheckCircle, Scale, FileText } from './Icons';
+import { Shield, Radar, Briefcase, Lock, Search, Network, CheckCircle, Scale, FileText } from './Icons.tsx';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -26,7 +26,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             <div className="bg-slate-900 p-1.5 rounded-lg group-hover:scale-110 transition-transform">
               <Radar className="text-blue-400 h-5 w-5" />
             </div>
-            <span className="font-black text-xl tracking-tighter uppercase italic">RiskRadar</span>
+            <span className="font-black text-xl tracking-tighter uppercase italic text-slate-900">RiskRadar</span>
           </button>
           
           <div className="hidden md:flex items-center gap-10 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
@@ -166,59 +166,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                 <p className="text-slate-500 leading-relaxed text-sm font-medium">{card.desc}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Trust & Anti-Hallucination */}
-      <section id="trust" className="py-32 bg-slate-50 border-y border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="bg-white rounded-[3rem] p-12 lg:p-20 border border-slate-200 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-12 opacity-5">
-               <Shield className="w-40 h-40" />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-20 items-center">
-              <div>
-                <h2 className="text-4xl font-black mb-8 tracking-tight uppercase italic leading-tight">Trust by Design: <br /> No Mock Data.</h2>
-                <div className="space-y-8">
-                  <div className="flex gap-4">
-                    <CheckCircle className="text-emerald-500 w-6 h-6 shrink-0" />
-                    <p className="text-slate-600 font-medium leading-relaxed">
-                      <span className="font-black text-slate-900 block mb-1 uppercase text-xs tracking-widest">Grounding Architecture</span>
-                      Every risk signal is grounded in a verified web source. Our AI cannot "invent" events; it only summarizes retrieved OSINT data.
-                    </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <CheckCircle className="text-emerald-500 w-6 h-6 shrink-0" />
-                    <p className="text-slate-600 font-medium leading-relaxed">
-                      <span className="font-black text-slate-900 block mb-1 uppercase text-xs tracking-widest">Live Jan 2026 Context</span>
-                      Using Gemini Search Grounding, we pull live information. Your dashboard is as fresh as the last indexed article.
-                    </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <CheckCircle className="text-emerald-500 w-6 h-6 shrink-0" />
-                    <p className="text-slate-600 font-medium leading-relaxed">
-                      <span className="font-black text-slate-900 block mb-1 uppercase text-xs tracking-widest">OSINT Attribution</span>
-                      We provide clickable direct URLs for every signal. The AI is the filter; the original source is the truth.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                 <div className="p-8 bg-slate-900 rounded-3xl text-white">
-                    <div className="flex items-center gap-3 mb-6">
-                       <Lock className="text-blue-400 w-5 h-5" />
-                       <span className="font-black text-[10px] uppercase tracking-widest">Compliance Protocol</span>
-                    </div>
-                    <ul className="space-y-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                       <li className="flex gap-3"><span className="text-blue-500">•</span> ZERO PRIVATE DATA INGESTION</li>
-                       <li className="flex gap-3"><span className="text-blue-500">•</span> NO FINANCIAL PREDICTIONS</li>
-                       <li className="flex gap-3"><span className="text-blue-500">•</span> DETERMINISTIC RETRIEVAL ONLY</li>
-                       <li className="flex gap-3"><span className="text-blue-500">•</span> FULL OSINT TRACEABILITY</li>
-                    </ul>
-                 </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>

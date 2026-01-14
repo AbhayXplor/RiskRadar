@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import LandingPage from './components/LandingPage';
-import Dashboard from './components/Dashboard';
+import LandingPage from './components/LandingPage.tsx';
+import Dashboard from './components/Dashboard.tsx';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');

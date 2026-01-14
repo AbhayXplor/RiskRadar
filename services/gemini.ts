@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types";
+import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types.ts";
 
 // Always initialize GoogleGenAI with { apiKey: process.env.API_KEY } inside functions to ensure correct key usage and prevent key leakage or misuse.
 export const resolveEntities = async (query: string, config: { model: GeminiModel }): Promise<CandidateEntity[]> => {
@@ -30,7 +30,6 @@ export const resolveEntities = async (query: string, config: { model: GeminiMode
       }
     });
 
-    // Extract grounding URLs as required for search grounding usage.
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const webSources = groundingChunks
       .filter(chunk => chunk.web)
@@ -42,51 +41,20 @@ export const resolveEntities = async (query: string, config: { model: GeminiMode
       groundingSources: webSources
     }));
   } catch (e) {
+    // Re-throw to allow dashboard to handle "Requested entity was not found." error
     console.error("Resolution failed", e);
-    return [];
+    throw e;
   }
 };
 
 export const analyzeBorrowerRisk = async (name: string, industry: string, config: { model: GeminiModel }): Promise<RiskAnalysisResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // High-fidelity prompt for 2025-2026 data and SMB proxy strategies
   const prompt = `It is currently early 2026. Perform deep risk surveillance for "${name}" (${industry}).
-  
-  URGENT: Prioritize latest data from 2025 and January 2026.
-  
-  SURVEILLANCE STRATEGY:
-  - For PUBLIC/LARGE entities: Search institutional news, SEC filings, and global regulatory logs.
-  - For PRIVATE/SMB entities (likely low news footprint): Search for 'SMB Proxies':
-    1. Secretary of State filings (check for administrative dissolution, delinquency, or tax liens).
-    2. Local/County court dockets (judgments or small claims).
-    3. Website/Digital integrity (check for recent downtime or 'parked' domains).
-    4. Sentiment pivots (sudden drops in Google/Yelp/Glassdoor reviews suggesting cash flow or management stress).
-
   REQUIRED TASKS:
-  1. Find latest risk signals.
-  2. Perform "Covenant Mapping": map signals to terms like 'Key Man Clause', 'Change of Control', or 'Material Adverse Effect'.
-  3. Perform "Supply Chain Ripple": identify impacts on major suppliers or customer network.
-  4. Compare event frequency to "${industry}" peers for a benchmark score.
-
-  Return JSON ONLY:
-  {
-    "summarySentence": "Overall 2025-2026 risk outlook...",
-    "benchmarkScore": "X% Higher/Lower than peers",
-    "signals": [
-      {
-        "title": "Clear headline",
-        "source": "Specific source name",
-        "date": "2025-MM-DD or 2026-01-DD",
-        "category": "LEGAL|REGULATORY|MANAGEMENT|OPERATIONAL|ENVIRONMENTAL",
-        "severity": "CRITICAL|HIGH|MEDIUM|LOW",
-        "summary": "Detailed context",
-        "impact": "Credit impact logic",
-        "covenantImpact": "Potential Breach: Clause Name - Reasoning",
-        "supplyChainRipple": "Network effect on suppliers/customers"
-      }
-    ]
-  }`;
+  1. Find latest risk signals from 2025/2026.
+  2. Perform "Covenant Mapping" and "Supply Chain Ripple" analysis.
+  Return JSON ONLY with summarySentence, benchmarkScore, and signals array.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -114,8 +82,7 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
                   impact: { type: Type.STRING },
                   covenantImpact: { type: Type.STRING },
                   supplyChainRipple: { type: Type.STRING }
-                },
-                required: ["title", "source", "category", "severity", "summary", "impact", "covenantImpact", "supplyChainRipple"]
+                }
               }
             }
           },
@@ -124,7 +91,6 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
       }
     });
 
-    // Extract grounding URLs as required for search grounding usage.
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const webSources = groundingChunks
       .filter(chunk => chunk.web)
@@ -145,6 +111,7 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
       signals: mappedSignals
     };
   } catch (error) {
+    // Re-throw to allow dashboard to handle "Requested entity was not found." error
     console.error("Analysis failed", error);
     throw error;
   }
