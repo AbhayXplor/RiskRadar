@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { Borrower, RiskSeverity, RiskSignal, RiskCategory, CandidateEntity, GeminiModel } from '../types.ts';
-import { Radar, ExternalLink, Info, Plus, Shield, FileText, CheckCircle, Search, Network, Scale, Lock, Briefcase } from './Icons.tsx';
-import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini.ts';
+import { Borrower, RiskSeverity, RiskSignal, RiskCategory, CandidateEntity, GeminiModel } from '../types';
+import { Radar, ExternalLink, Info, Plus, Shield, FileText, CheckCircle, Search, Network, Scale, Lock, Briefcase } from './Icons';
+import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini';
 
 const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => {
   // Config State
@@ -38,9 +38,14 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setIsResolving(true);
-    const results = await resolveEntities(searchQuery, { model });
-    setCandidates(results);
-    setIsResolving(false);
+    try {
+      const results = await resolveEntities(searchQuery, { model });
+      setCandidates(results);
+    } catch (err) {
+      alert("Resolution failed. Verify your API key is configured in the environment.");
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const handleCommitEntity = async (candidate: CandidateEntity) => {
@@ -163,8 +168,8 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
             </div>
           </div>
           <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${process.env.API_KEY ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-            OSINT Grounding: {process.env.API_KEY ? 'Active (2026)' : 'Key Error'}
+            <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${(typeof process !== 'undefined' && process.env.API_KEY) ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            OSINT Grounding: {(typeof process !== 'undefined' && process.env.API_KEY) ? 'Active (2026)' : 'Key Error'}
           </div>
         </header>
 
@@ -218,10 +223,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
         {isResolving || loading ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
             <div className="relative">
-               <Radar className="w-16 h-16 text-blue-600 animate-spin" />
-               <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping" />
-               </div>
+               <Radar className="w-16 h-16 text-blue-600" />
             </div>
             <div className="mt-8 text-sm font-black uppercase tracking-[0.5em] text-slate-900">{loading ? 'Indexing 2026 Risk Data...' : 'Resolving Identity...'}</div>
             <div className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] max-w-xs text-center leading-relaxed">Scanning SoS Portals, News Terminals, and Proxy Signal Points...</div>

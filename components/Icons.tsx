@@ -7,14 +7,24 @@ export const Shield = ({ className }: { className?: string }) => (
 
 export const Radar = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
-    <circle cx="12" cy="12" r="6" strokeOpacity="0.5" />
-    <circle cx="12" cy="12" r="2" />
-    <path d="M12 2v4" />
-    <path d="M12 18v4" />
-    <path d="M2 12h4" />
-    <path d="M18 12h4" />
-    <path d="M12 12l5.5-5.5" className="animate-pulse" />
+    {/* Concentric rings for institutional feel */}
+    <circle cx="12" cy="12" r="9" strokeOpacity="0.1" />
+    <circle cx="12" cy="12" r="6" strokeOpacity="0.2" />
+    <circle cx="12" cy="12" r="3" strokeOpacity="0.3" />
+    {/* Sweep Line */}
+    <path d="M12 12 L12 3" strokeWidth="2" strokeLinecap="round">
+      <animateTransform 
+        attributeName="transform" 
+        type="rotate" 
+        from="0 12 12" 
+        to="360 12 12" 
+        dur="4s" 
+        repeatCount="indefinite" 
+      />
+    </path>
+    {/* Focal Signal Points */}
+    <circle cx="12" cy="12" r="1" fill="currentColor" />
+    <circle cx="18" cy="8" r="1" fill="currentColor" className="animate-pulse" />
   </svg>
 );
 
@@ -32,18 +42,6 @@ export const Briefcase = ({ className }: { className?: string }) => (
 
 export const Search = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-);
-
-export const TrendingUp = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-);
-
-export const TrendingDown = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
-);
-
-export const TrendingFlat = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="5" y1="12" x2="19" y2="12"/></svg>
 );
 
 export const Info = ({ className }: { className?: string }) => (
