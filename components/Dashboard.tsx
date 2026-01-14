@@ -7,7 +7,7 @@ import { resolveEntities, analyzeBorrowerRisk } from '../services/gemini.ts';
 const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => {
   // Config State
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('riskradar_key') || '');
-  const [model, setModel] = useState<GeminiModel>(() => (localStorage.getItem('riskradar_model') as GeminiModel) || 'gemini-3-flash-preview');
+  const [model, setModel] = useState<GeminiModel>(() => (localStorage.getItem('riskradar_model') as GeminiModel) || 'gemini-flash-latest');
   const [showConfig, setShowConfig] = useState(false);
   
   // Data State
@@ -184,8 +184,10 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                    value={model}
                    onChange={(e) => setModel(e.target.value as GeminiModel)}
                  >
+                   <option value="gemini-flash-latest">Gemini Flash (Latest)</option>
                    <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
                    <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                   <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                  </select>
                </div>
                <p className="text-[8px] text-slate-600 italic">Keys are stored locally in your browser.</p>

@@ -2,9 +2,48 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { RiskCategory, RiskSeverity, RiskSignal, RiskAnalysisResult, CandidateEntity, GeminiModel } from "../types.ts";
 
+/**
+ * Helper to safely extract JSON from a potentially conversational model response
+ */
+const extractJSON = (text: string): any => {
+  try {
+    // Attempt direct parse first
+    return JSON.parse(text.trim());
+  } catch (e) {
+    // If that fails, look for markdown code blocks
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1].trim());
+      } catch (e2) {
+        throw new Error("Could not parse JSON from model response.");
+      }
+    }
+    // Final attempt: find the first '[' or '{' and the last ']' or '}'
+    const firstBrace = text.indexOf('{');
+    const firstBracket = text.indexOf('[');
+    const start = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? firstBrace : firstBracket;
+    
+    const lastBrace = text.lastIndexOf('}');
+    const lastBracket = text.lastIndexOf(']');
+    const end = (lastBrace !== -1 && (lastBracket === -1 || lastBrace > lastBracket)) ? lastBrace : lastBracket;
+
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(text.substring(start, end + 1));
+      } catch (e3) {
+        throw new Error("Failed to extract valid JSON from search response.");
+      }
+    }
+    throw new Error("Model response did not contain a valid JSON structure.");
+  }
+};
+
 export const resolveEntities = async (query: string, config: { model: GeminiModel, apiKey: string }): Promise<CandidateEntity[]> => {
   const ai = new GoogleGenAI({ apiKey: config.apiKey });
-  const prompt = `Search for 3 corporate entities matching: "${query}". Return Official Name, Ticker, Industry, and 1-sentence description in JSON.`;
+  const prompt = `Search for 3 corporate entities matching: "${query}". 
+  Return the results as a raw JSON array of objects with these keys: name, ticker, industry, description.
+  DO NOT include any conversational text or explanation. Just the JSON.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -12,20 +51,7 @@ export const resolveEntities = async (query: string, config: { model: GeminiMode
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              ticker: { type: Type.STRING },
-              industry: { type: Type.STRING },
-              description: { type: Type.STRING }
-            },
-            required: ["name", "industry", "description"]
-          }
-        }
+        // responseMimeType: "application/json" is unsupported when using tools
       }
     });
 
@@ -34,7 +60,7 @@ export const resolveEntities = async (query: string, config: { model: GeminiMode
       .filter(chunk => chunk.web)
       .map(chunk => ({ title: chunk.web?.title || "Source", uri: chunk.web?.uri || "" }));
 
-    const entities = JSON.parse(response.text || "[]");
+    const entities = extractJSON(response.text || "[]");
     return entities.map((e: any) => ({
       ...e,
       groundingSources: webSources
@@ -50,9 +76,14 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
   
   const prompt = `It is currently early 2026. Perform deep risk surveillance for "${name}" (${industry}).
   REQUIRED TASKS:
-  1. Find latest risk signals from 2025/2026.
+  1. Find latest risk signals from 2025/2026 using search.
   2. Perform "Covenant Mapping" and "Supply Chain Ripple" analysis.
-  Return JSON ONLY with summarySentence, benchmarkScore, and signals array.`;
+  3. Return results as a single JSON object with: 
+     - summarySentence (1 sentence)
+     - benchmarkScore (A string e.g. "72/100")
+     - signals (array of objects with: title, source, date, category, severity, summary, impact, covenantImpact, supplyChainRipple)
+  
+  ONLY return the JSON. No markdown blocks if possible, no preamble.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -60,32 +91,7 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summarySentence: { type: Type.STRING },
-            benchmarkScore: { type: Type.STRING },
-            signals: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  source: { type: Type.STRING },
-                  date: { type: Type.STRING },
-                  category: { type: Type.STRING },
-                  severity: { type: Type.STRING },
-                  summary: { type: Type.STRING },
-                  impact: { type: Type.STRING },
-                  covenantImpact: { type: Type.STRING },
-                  supplyChainRipple: { type: Type.STRING }
-                }
-              }
-            }
-          },
-          required: ["summarySentence", "signals", "benchmarkScore"]
-        }
+        // responseMimeType: "application/json" is unsupported when using tools
       }
     });
 
@@ -94,7 +100,7 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
       .filter(chunk => chunk.web)
       .map(chunk => ({ title: chunk.web?.title || "Source", uri: chunk.web?.uri || "" }));
 
-    const result = JSON.parse(response.text || '{}');
+    const result = extractJSON(response.text || '{}');
     const mappedSignals = (result.signals || []).map((s: any, i: number) => ({
       ...s,
       id: `sig-${i}-${Date.now()}`,
@@ -104,8 +110,8 @@ export const analyzeBorrowerRisk = async (name: string, industry: string, config
     }));
 
     return {
-      summarySentence: result.summarySentence,
-      benchmarkScore: result.benchmarkScore,
+      summarySentence: result.summarySentence || "Analysis complete.",
+      benchmarkScore: result.benchmarkScore || "N/A",
       signals: mappedSignals
     };
   } catch (error) {

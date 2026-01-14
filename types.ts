@@ -63,7 +63,7 @@ export interface CandidateEntity {
 }
 
 export type GeminiModel = 
+  | 'gemini-flash-latest'
   | 'gemini-3-flash-preview' 
   | 'gemini-3-pro-preview' 
-  | 'gemini-flash-lite-latest'
-  | 'gemini-2.5-flash-native-audio-preview-12-2025';
+  | 'gemini-2.5-flash';
